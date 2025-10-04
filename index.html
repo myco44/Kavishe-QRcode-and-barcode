@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kavishe Barcode, QR & OCR (Fast)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:18px; background:#f1f5f9; color:#0f172a; }
+    .card { background:white; border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(0,0,0,0.08); max-width:800px; margin:auto; margin-bottom:20px; }
+    h1, h2 { font-size:20px; margin-bottom:12px; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    input, select { width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; margin-top:6px; box-sizing:border-box; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .col { flex:1; min-width:150px; }
+    button { background:#0ea5a4; color:white; border:0; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:700; margin-top:10px; }
+    button.secondary { background:#64748b; }
+    #preview { margin-top:18px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+    #barcode, #qrcode { max-width:100%; }
+    #ocrResult { margin-top:12px; padding:10px; border:1px solid #d1d5db; border-radius:8px; background:#f8fafc; font-size:14px; white-space:pre-wrap; min-height:40px; }
+  </style>
+</head>
+<body>
+  <!-- Generator -->
+  <div class="card">
+    <h1>Mtengenezaji wa Barcode & QR Code</h1>
+    <label for="value">Maandishi / Nambari</label>
+    <input id="value" type="text" placeholder="Mfano: 123456789012 au https://example.com" value="123456789012">
+
+    <div class="row">
+      <div class="col">
+        <label for="type">Chagua aina ya code</label>
+        <select id="type">
+          <option value="barcode">Barcode</option>
+          <option value="qrcode">QR Code</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="format">Format (ikiwa barcode)</label>
+        <select id="format">
+          <option value="CODE128">CODE128</option>
+          <option value="EAN13">EAN13</option>
+          <option value="UPC">UPC</option>
+          <option value="EAN8">EAN8</option>
+          <option value="ITF">ITF</option>
+          <option value="CODE39">CODE39</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="size">Ukubwa (px)</label>
+        <input id="size" type="number" value="200" min="50" max="600">
+      </div>
+      <div class="col">
+        <label for="color">Rangi ya mstari</label>
+        <input id="color" type="color" value="#000000">
+      </div>
+    </div>
+
+    <button id="generate">Generate</button>
+    <button id="download-svg" class="secondary">Download SVG</button>
+    <button id="download-png" class="secondary">Download PNG</button>
+
+    <div id="preview">
+      <svg id="barcode"></svg>
+      <div id="qrcode"></div>
+    </div>
+  </div>
+
+  <!-- OCR -->
+  <div class="card">
+    <h2>Soma Maandishi Kutoka Picha (Fast OCR)</h2>
+    <p>Pakia picha yenye maandishi. Mfumo utapunguza ukubwa kabla ya kusoma ili iwe haraka.</p>
+    <input type="file" accept="image/*" id="ocrInput">
+    <div id="ocrResult">Hakuna maandishi bado...</div>
+  </div>
+
+  <!-- Libs -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2/dist/tesseract.min.js"></script>
+
+  <script>
+    let qr;
+
+    function generateCode() {
+      const value = document.getElementById('value').value.trim();
+      const type = document.getElementById('type').value;
+      const format = document.getElementById('format').value;
+      const size = parseInt(document.getElementById('size').value,10) || 200;
+      const color = document.getElementById('color').value;
+
+      document.getElementById('barcode').style.display = "none";
+      document.getElementById('qrcode').style.display = "none";
+
+      if (!value) { alert("Tafadhali andika maandishi au nambari."); return; }
+
+      if (type === "barcode") {
+        const svg = document.getElementById("barcode");
+        document.getElementById('qrcode').innerHTML = "";
+        document.getElementById('barcode').style.display = "block";
+        try {
+          JsBarcode(svg, value, {
+            format: format,
+            lineColor: color,
+            width: 2,
+            height: size/3,
+            displayValue: true,
+            fontSize: 16,
+            margin: 10,
+          });
+        } catch(e) { alert("Hitilafu: " + e.message); }
+      } else {
+        document.getElementById('barcode').innerHTML = "";
+        document.getElementById('qrcode').innerHTML = "";
+        document.getElementById('qrcode').style.display = "block";
+        qr = new QRCode(document.getElementById("qrcode"), {
+          text: value,
+          width: size,
+          height: size,
+          colorDark : color,
+          colorLight : "#ffffff",
+          correctLevel : QRCode.CorrectLevel.H
+        });
+      }
+    }
+
+    function downloadSVG() {
+      const type = document.getElementById('type').value;
+      if (type === "barcode") {
+        const svg = document.getElementById("barcode");
+        if (!svg.innerHTML.trim()) { alert("Generate barcode kwanza."); return; }
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svg);
+        const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "code.svg";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert("QR Code haiwezi kupakuliwa kama SVG hapa. Tumia PNG.");
+      }
+    }
+
+    function downloadPNG() {
+      const type = document.getElementById('type').value;
+      let element;
+      if (type === "barcode") {
+        element = document.getElementById("barcode");
+        if (!element.innerHTML.trim()) { alert("Generate barcode kwanza."); return; }
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(element);
+        const img = new Image();
+        const svgBlob = new Blob([source], {type:"image/svg+xml;charset=utf-8"});
+        const url = URL.createObjectURL(svgBlob);
+        img.onload = function() {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width; canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(img,0,0);
+          canvas.toBlob(function(blob){
+            const url2 = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url2;
+            a.download = "code.png";
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url2);
+          });
+        };
+        img.src = url;
+      } else {
+        element = document.querySelector("#qrcode canvas");
+        if (!element) { alert("Generate QR Code kwanza."); return; }
+        const a = document.createElement("a");
+        a.href = element.toDataURL("image/png");
+        a.download = "qrcode.png";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+    }
+
+    // OCR optimized
+    document.getElementById("ocrInput").addEventListener("change", function(event){
+      const file = event.target.files[0];
+      if (!file) return;
+      const resultDiv = document.getElementById("ocrResult");
+      resultDiv.innerText = "Inasoma maandishi, tafadhali subiri...";
+
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const img = new Image();
+        img.onload = function(){
+          // Resize large images to max width 800
+          const maxWidth = 800;
+          let scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          Tesseract.recognize(canvas, 'eng', {
+            logger: m => console.log(m)
+          })
+          .then(({ data: { text } }) => {
+            resultDiv.innerText = text.trim() || "Hakuna maandishi yaliyopatikana.";
+          })
+          .catch(err => { resultDiv.innerText = "Hitilafu: " + err.message; });
+        };
+        img.src = e.target.result;
+      }
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("generate").onclick = generateCode;
+    document.getElementById("download-svg").onclick = downloadSVG;
+    document.getElementById("download-png").onclick = downloadPNG;
+
+    window.onload = generateCode;
+  </script>
+</body>
+</html>
